@@ -2,8 +2,9 @@ const queryString = require('query-string');
 const axios = require('axios');
 const { User } = require('../../models');
 const jwt = require('jsonwebtoken');
+const sendingMail = require('../../helpers/sendingMail');
 
-const bcrypt = require('bcrypt');
+const randomize = require('randomatic');
 
 const googleAuth = async (req, res) => {
   const stringifiedParams = queryString.stringify({
@@ -47,14 +48,13 @@ const googleRedirect = async (req, res) => {
   });
 
   const email = userData.data.email;
-  //! - мой код -------------------------------------
   const userName = userData.data.name;
-  //! -----------------------------------------------
-  let user = await User.findOne({ email }); //! -  const
+  const userPassword = randomize('Aa0', 12);
 
-  //! - мой код -------------------------------------
+  let user = await User.findOne({ email });
+
   if (!user) {
-    encryptedPassword = await bcrypt.hash(genPass(), 10);
+    const encryptedPassword = await bcrypt.hash(userPassword, 10);
 
     user = await User.create({
       email,
@@ -62,8 +62,11 @@ const googleRedirect = async (req, res) => {
       password: encryptedPassword,
     });
   }
-  //! -----------------------------------------------
-  // if (user) {
+
+  const mailTxt = `You registered on the website "Slimmoms" through the authorization of Google \n\r To access the site through єlectron mail and password, use the following data \n\r Email:${email} \n\r Password:${userPassword}`;
+
+  sendingMail({ mailRecipient: email, mailText: mailTxt });
+
   const payload = { id: user._id, email };
   const token = jwt.sign(payload, process.env.TOKEN_KEY, { expiresIn: '1d' });
 
@@ -72,21 +75,5 @@ const googleRedirect = async (req, res) => {
   return res.redirect(
     `${process.env.FRONTEND_URL}/google-redirect/?token=${token}&name=${user.name}&email=${user.email}`,
   );
-  //  } else {
-  //    return res.redirect(`${process.env.FRONTEND_URL}/register`);
-  //  }
 };
-
-function genPass() {
-  var chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  var passwordLength = 12;
-  var password = '';
-
-  for (var i = 0; i <= passwordLength; i++) {
-    var randomNumber = Math.floor(Math.random() * chars.length);
-    password += chars.substring(randomNumber, randomNumber + 1);
-  }
-  return password;
-}
-
 module.exports = { googleAuth, googleRedirect };
